@@ -11,7 +11,6 @@ import java.time.LocalDateTime;
 
 public class CalculadoraReembolso {
 
-    // ETAPA 11: Constante para o teto máximo de reembolso
     private static final BigDecimal TETO_MAXIMO_REEMBOLSO = new BigDecimal("150.00");
 
     private HistoricoConsultas historico;
@@ -76,7 +75,7 @@ public class CalculadoraReembolso {
         BigDecimal reembolso = valorConsulta.multiply(percentualCobertura)
                 .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
 
-        // ETAPA 11: Aplicar teto máximo
+        // Aplicar teto máximo
         reembolso = aplicarTetoMaximo(reembolso);
 
         if (historico != null) {
