@@ -4,14 +4,14 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class Consulta {
-    private final BigDecimal valorConsulta;
-    private final BigDecimal percentualCobertura;
-    private final BigDecimal valorReembolso;
-    private final String nomePaciente;
-    private final LocalDateTime dataHora;
+    private BigDecimal valorConsulta;
+    private BigDecimal percentualCobertura;
+    private BigDecimal valorReembolso;
+    private String nomePaciente;
+    private LocalDateTime dataHora; // NOVO CAMPO
 
-    public Consulta(BigDecimal valorConsulta, BigDecimal percentualCobertura,
-                    BigDecimal valorReembolso, String nomePaciente) {
+
+    public Consulta(BigDecimal valorConsulta, BigDecimal percentualCobertura, BigDecimal valorReembolso, String nomePaciente) {
         this.valorConsulta = valorConsulta;
         this.percentualCobertura = percentualCobertura;
         this.valorReembolso = valorReembolso;
@@ -19,6 +19,16 @@ public class Consulta {
         this.dataHora = LocalDateTime.now();
     }
 
+
+    public Consulta(BigDecimal valorConsulta, BigDecimal percentualCobertura, BigDecimal valorReembolso, String nomePaciente, LocalDateTime dataHora) {
+        this.valorConsulta = valorConsulta;
+        this.percentualCobertura = percentualCobertura;
+        this.valorReembolso = valorReembolso;
+        this.nomePaciente = nomePaciente;
+        this.dataHora = dataHora;
+    }
+
+    // Getters existentes
     public BigDecimal getValorConsulta() {
         return valorConsulta;
     }
@@ -35,7 +45,29 @@ public class Consulta {
         return nomePaciente;
     }
 
+
     public LocalDateTime getDataHora() {
         return dataHora;
+    }
+
+
+    public void setValorConsulta(BigDecimal valorConsulta) {
+        this.valorConsulta = valorConsulta;
+    }
+
+    public void setPercentualCobertura(BigDecimal percentualCobertura) {
+        this.percentualCobertura = percentualCobertura;
+    }
+
+    public void setValorReembolso(BigDecimal valorReembolso) {
+        this.valorReembolso = valorReembolso;
+    }
+
+    public void setNomePaciente(String nomePaciente) {
+        this.nomePaciente = nomePaciente;
+    }
+
+    public void setDataHora(LocalDateTime dataHora) {
+        this.dataHora = dataHora;
     }
 }

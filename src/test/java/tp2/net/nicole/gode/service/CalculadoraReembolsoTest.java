@@ -4,7 +4,7 @@ import tp2.net.nicole.gode.model.Paciente;
 import tp2.net.nicole.gode.repository.HistoricoConsultasFake;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import java.math.BigDecimal;
 import tp2.net.nicole.gode.model.PlanoSaude;
 
@@ -15,6 +15,11 @@ class CalculadoraReembolsoTest {
     private Paciente pacienteDummy;
     private HistoricoConsultasFake historicoFake;
 
+    // ETAPA 7: Novas variáveis para auditoria
+    private AuditoriaSpy auditoriaSpy;
+    private CalculadoraReembolso calculadoraComAuditoria;
+    private CalculadoraReembolso calculadoraCompleta;
+
     @BeforeEach
     void setUp() {
         // Criando as instâncias para os testes
@@ -22,6 +27,11 @@ class CalculadoraReembolsoTest {
         historicoFake = new HistoricoConsultasFake();
         calculadoraComHistorico = new CalculadoraReembolso(historicoFake);
         pacienteDummy = new Paciente("João Silva");
+
+        // ETAPA 7: Configurando auditoria
+        auditoriaSpy = new AuditoriaSpy();
+        calculadoraComAuditoria = new CalculadoraReembolso(auditoriaSpy);
+        calculadoraCompleta = new CalculadoraReembolso(historicoFake, auditoriaSpy);
     }
 
     // Primeiro teste - calculando reembolso básico
@@ -354,6 +364,115 @@ class CalculadoraReembolsoTest {
 
         assertEqualsComMargem(new BigDecimal("100.00"), resultado25);
         assertEqualsComMargem(new BigDecimal("400.00"), resultado100);
+    }
+
+    // ETAPA 7: TESTES COM SPY DE AUDITORIA
+
+    // Teste básico: verificar se a auditoria é chamada
+    @Test
+    void deveRegistrarConsultaNaAuditoria() {
+        BigDecimal valorConsulta = new BigDecimal("200.00");
+        BigDecimal percentualCobertura = new BigDecimal("70");
+
+        calculadoraComAuditoria.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+
+        // Verificações do spy
+        assertTrue(auditoriaSpy.foiChamado(), "Auditoria deveria ter sido chamada");
+        assertEquals(1, auditoriaSpy.getQuantidadeChamadas(), "Auditoria deveria ter sido chamada exatamente 1 vez");
+    }
+
+    // Teste verificando o conteúdo do registro de auditoria
+    @Test
+    void deveRegistrarDetalhesCorretosNaAuditoria() {
+        BigDecimal valorConsulta = new BigDecimal("300.00");
+        BigDecimal percentualCobertura = new BigDecimal("80");
+
+        calculadoraComAuditoria.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+
+        String ultimoRegistro = auditoriaSpy.getUltimoRegistro();
+        assertTrue(ultimoRegistro.contains("João Silva"), "Registro deve conter o nome do paciente");
+        assertTrue(ultimoRegistro.contains("300.00"), "Registro deve conter o valor da consulta");
+        assertTrue(ultimoRegistro.contains("240.00"), "Registro deve conter o valor do reembolso");
+    }
+
+    // Teste com múltiplas consultas
+    @Test
+    void deveRegistrarMultiplasConsultasNaAuditoria() {
+        Paciente paciente1 = new Paciente("Maria Santos");
+        Paciente paciente2 = new Paciente("Pedro Oliveira");
+
+        calculadoraComAuditoria.calcularReembolso(new BigDecimal("100.00"), new BigDecimal("50"), paciente1);
+        calculadoraComAuditoria.calcularReembolso(new BigDecimal("200.00"), new BigDecimal("70"), paciente2);
+
+        assertEquals(2, auditoriaSpy.getQuantidadeChamadas(), "Auditoria deveria ter sido chamada 2 vezes");
+        assertTrue(auditoriaSpy.contemRegistro("Maria Santos"), "Deve conter registro da Maria");
+        assertTrue(auditoriaSpy.contemRegistro("Pedro Oliveira"), "Deve conter registro do Pedro");
+    }
+
+    // Teste com paciente nulo
+    @Test
+    void deveRegistrarAuditoriaComPacienteAnonimo() {
+        BigDecimal valorConsulta = new BigDecimal("150.00");
+        BigDecimal percentualCobertura = new BigDecimal("60");
+
+        calculadoraComAuditoria.calcularReembolso(valorConsulta, percentualCobertura, null);
+
+        assertTrue(auditoriaSpy.foiChamado(), "Auditoria deveria ter sido chamada");
+        assertTrue(auditoriaSpy.contemRegistro("Anônimo"), "Deve registrar paciente como Anônimo");
+    }
+
+    // Teste com calculadora sem auditoria (não deve chamar)
+    @Test
+    void naoDeveRegistrarAuditoriaQuandoNaoConfigurada() {
+        BigDecimal valorConsulta = new BigDecimal("100.00");
+        BigDecimal percentualCobertura = new BigDecimal("50");
+
+        // Usando calculadora sem auditoria
+        calculadora.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+
+        // O spy não deveria ter sido chamado
+        assertFalse(auditoriaSpy.foiChamado(), "Auditoria não deveria ter sido chamada");
+        assertEquals(0, auditoriaSpy.getQuantidadeChamadas(), "Nenhuma chamada deveria ter sido feita");
+    }
+
+    // Teste com histórico E auditoria funcionando juntos
+    @Test
+    void deveFuncionarComHistoricoEAuditoriaSimultaneamente() {
+        BigDecimal valorConsulta = new BigDecimal("250.00");
+        BigDecimal percentualCobertura = new BigDecimal("75");
+
+        calculadoraCompleta.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+
+        // Verificar histórico
+        assertEquals(1, historicoFake.listarConsultas().size(), "Deve ter 1 consulta no histórico");
+
+        // Verificar auditoria
+        assertTrue(auditoriaSpy.foiChamado(), "Auditoria deveria ter sido chamada");
+        assertTrue(auditoriaSpy.contemRegistro("João Silva"), "Auditoria deve conter o nome do paciente");
+    }
+
+    // Teste com plano de saúde e auditoria
+    @Test
+    void deveRegistrarAuditoriaComPlanoSaude() {
+        PlanoSaude planoTeste = new PlanoSaude() {
+            @Override
+            public BigDecimal getPercentualCobertura() {
+                return new BigDecimal("80");
+            }
+
+            @Override
+            public String getNome() {
+                return "Plano Premium";
+            }
+        };
+
+        BigDecimal valorConsulta = new BigDecimal("400.00");
+        calculadoraComAuditoria.calcularReembolsoComPlano(valorConsulta, planoTeste, pacienteDummy);
+
+        assertTrue(auditoriaSpy.foiChamado(), "Auditoria deveria ter sido chamada");
+        assertTrue(auditoriaSpy.contemRegistro("João Silva"), "Deve conter o nome do paciente");
+        assertTrue(auditoriaSpy.contemRegistro("400.00"), "Deve conter o valor da consulta");
+        assertTrue(auditoriaSpy.contemRegistro("320.00"), "Deve conter o valor do reembolso (80% de 400)");
     }
 
     // Método auxiliar para comparar BigDecimal
