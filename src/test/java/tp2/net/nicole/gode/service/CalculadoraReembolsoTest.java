@@ -33,7 +33,7 @@ class CalculadoraReembolsoTest {
 
     @BeforeEach
     void setUp() {
-        // Instâncias existentes
+        // Básico
         calculadora = new CalculadoraReembolso();
         historicoFake = new HistoricoConsultasFake();
         calculadoraComHistorico = new CalculadoraReembolso(historicoFake);
@@ -51,7 +51,7 @@ class CalculadoraReembolsoTest {
 
 
 
-    // Calculando reembolso básico
+    // Reembolso básico
     @Test
     void deveCalcularReembolsoBasicoComPercentualFixo() {
         BigDecimal valorConsulta = new BigDecimal("200.00");
@@ -602,7 +602,7 @@ class CalculadoraReembolsoTest {
         verify(autorizadorMock, times(1)).autorizarReembolso(pacienteDummy, valorConsulta);
     }
 
-    // Teste sem autorizador configurado (deve funcionar normalmente)
+
     @Test
     void deveFuncionarNormalmenteSemAutorizador() {
         BigDecimal valorConsulta = new BigDecimal("200.00");
@@ -614,7 +614,7 @@ class CalculadoraReembolsoTest {
         verifyNoInteractions(autorizadorMock);
     }
 
-    // Teste completo: histórico + auditoria + autorização
+    // Teste completo
     @Test
     void deveFuncionarComTodasAsDependencias() {
         when(autorizadorMock.autorizarReembolso(any(Paciente.class), any(BigDecimal.class))).thenReturn(true);
@@ -652,7 +652,7 @@ class CalculadoraReembolsoTest {
         verify(autorizadorMock, times(2)).autorizarReembolso(any(Paciente.class), any(BigDecimal.class));
     }
 
-    // Método auxiliar para comparar BigDecimal
+
     private void assertEqualsComMargem(BigDecimal esperado, BigDecimal atual) {
         assertEquals(0, esperado.compareTo(atual),
                 "Valores devem ser iguais: esperado=" + esperado + ", atual=" + atual);

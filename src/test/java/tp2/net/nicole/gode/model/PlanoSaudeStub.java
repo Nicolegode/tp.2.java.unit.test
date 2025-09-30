@@ -41,7 +41,7 @@ class PlanoSaudeStubBasico implements PlanoSaude {
     }
 }
 
-// Plano premium com 80% de cobertura - para testar valores maiores
+// Plano premium com 80% de cobertura
 class PlanoSaudeStubPremium implements PlanoSaude {
     // Sempre retorna 80% de cobertura
     @Override
