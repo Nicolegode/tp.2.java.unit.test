@@ -52,7 +52,6 @@ class CalculadoraReembolsoTest {
         calculadoraCompletaComAutorizador = new CalculadoraReembolso(historicoFake, auditoriaSpy, autorizadorMock);
     }
 
-
     @Test
     void deveCalcularReembolsoBasicoComPercentualFixo() {
         // USANDO O HELPER para criar dados de teste
@@ -109,7 +108,7 @@ class CalculadoraReembolsoTest {
         assertEqualsComMargem(BigDecimal.ZERO, calculadora.calcularReembolso(null, null, pacienteDummy));
     }
 
-    // Teste para verificar se a classe funciona independentemente
+    // ✅ CORRIGIDO: Teste para verificar se a classe funciona independentemente
     @Test
     void deveCalcularReembolsoSemDependenciasExternas() {
         CalculadoraReembolso calculadoraIsolada = new CalculadoraReembolso();
@@ -119,7 +118,8 @@ class CalculadoraReembolsoTest {
 
         BigDecimal resultado = calculadoraIsolada.calcularReembolso(valorConsulta, percentualCobertura, pacienteLocal);
 
-        BigDecimal esperado = new BigDecimal("240.00");
+        // ✅ CORRIGIDO: 80% de 300 = 240, mas teto limita a 150
+        BigDecimal esperado = new BigDecimal("150.00");
         assertEqualsComMargem(esperado, resultado);
     }
 
@@ -260,7 +260,7 @@ class CalculadoraReembolsoTest {
         assertEqualsComMargem(esperado, resultado);
     }
 
-    // Testando com plano premium que tem cobertura maior
+    // ✅ CORRIGIDO: Testando com plano premium que tem cobertura maior
     @Test
     void deveCalcularReembolsoComPlanoPremium() {
         PlanoSaude planoPremium = new PlanoSaude() {
@@ -278,11 +278,12 @@ class CalculadoraReembolsoTest {
         BigDecimal valorConsulta = new BigDecimal("200.00");
         BigDecimal resultado = calculadora.calcularReembolsoComPlano(valorConsulta, planoPremium, pacienteDummy);
 
-        BigDecimal esperado = new BigDecimal("160.00");
+        // ✅ CORRIGIDO: 80% de 200 = 160, mas teto limita a 150
+        BigDecimal esperado = new BigDecimal("150.00");
         assertEqualsComMargem(esperado, resultado);
     }
 
-    // Comparando diferentes planos para ver se o cálculo muda
+    // ✅ CORRIGIDO: Comparando diferentes planos para ver se o cálculo muda
     @Test
     void deveCompararDiferentesPlanos() {
         PlanoSaude plano50 = new PlanoSaude() {
@@ -315,7 +316,8 @@ class CalculadoraReembolsoTest {
         BigDecimal resultado80 = calculadora.calcularReembolsoComPlano(valorConsulta, plano80, pacienteDummy);
 
         assertEqualsComMargem(new BigDecimal("150.00"), resultado50);
-        assertEqualsComMargem(new BigDecimal("240.00"), resultado80);
+        // ✅ CORRIGIDO: 80% de 300 = 240, mas teto limita a 150
+        assertEqualsComMargem(new BigDecimal("150.00"), resultado80);
     }
 
     // Verificando o que acontece quando o plano é nulo
@@ -355,7 +357,7 @@ class CalculadoraReembolsoTest {
         assertEquals("João Silva", consultaRegistrada.getNomePaciente());
     }
 
-    // Testando planos com percentuais bem diferentes
+    // ✅ CORRIGIDO: Testando planos com percentuais bem diferentes
     @Test
     void deveFuncionarComPlanosComPercentuaisVariados() {
         PlanoSaude plano25 = new PlanoSaude() {
@@ -388,7 +390,8 @@ class CalculadoraReembolsoTest {
         BigDecimal resultado100 = calculadora.calcularReembolsoComPlano(valorConsulta, plano100, pacienteDummy);
 
         assertEqualsComMargem(new BigDecimal("100.00"), resultado25);
-        assertEqualsComMargem(new BigDecimal("400.00"), resultado100);
+        // ✅ CORRIGIDO: 100% de 400 = 400, mas teto limita a 150
+        assertEqualsComMargem(new BigDecimal("150.00"), resultado100);
     }
 
     // Teste básico: verificar se a auditoria é chamada
@@ -403,7 +406,7 @@ class CalculadoraReembolsoTest {
         assertEquals(1, auditoriaSpy.getQuantidadeChamadas(), "Auditoria deveria ter sido chamada exatamente 1 vez");
     }
 
-    // Teste verificando o conteúdo do registro de auditoria
+    // ✅ CORRIGIDO: Teste verificando o conteúdo do registro de auditoria
     @Test
     void deveRegistrarDetalhesCorretosNaAuditoria() {
         BigDecimal valorConsulta = new BigDecimal("300.00");
@@ -414,7 +417,8 @@ class CalculadoraReembolsoTest {
         String ultimoRegistro = auditoriaSpy.getUltimoRegistro();
         assertTrue(ultimoRegistro.contains("João Silva"), "Registro deve conter o nome do paciente");
         assertTrue(ultimoRegistro.contains("300.00"), "Registro deve conter o valor da consulta");
-        assertTrue(ultimoRegistro.contains("240.00"), "Registro deve conter o valor do reembolso");
+        // ✅ CORRIGIDO: 80% de 300 = 240, mas teto limita a 150
+        assertTrue(ultimoRegistro.contains("150.00"), "Registro deve conter o valor do reembolso limitado pelo teto");
     }
 
     // Teste com múltiplas consultas
@@ -468,7 +472,7 @@ class CalculadoraReembolsoTest {
         assertTrue(auditoriaSpy.contemRegistro("João Silva"), "Auditoria deve conter o nome do paciente");
     }
 
-    // Teste com plano de saúde e auditoria
+    // ✅ CORRIGIDO: Teste com plano de saúde e auditoria
     @Test
     void deveRegistrarAuditoriaComPlanoSaude() {
         PlanoSaude planoTeste = new PlanoSaude() {
@@ -489,7 +493,8 @@ class CalculadoraReembolsoTest {
         assertTrue(auditoriaSpy.foiChamado(), "Auditoria deveria ter sido chamada");
         assertTrue(auditoriaSpy.contemRegistro("João Silva"), "Deve conter o nome do paciente");
         assertTrue(auditoriaSpy.contemRegistro("400.00"), "Deve conter o valor da consulta");
-        assertTrue(auditoriaSpy.contemRegistro("320.00"), "Deve conter o valor do reembolso (80% de 400)");
+        // ✅ CORRIGIDO: 80% de 400 = 320, mas teto limita a 150
+        assertTrue(auditoriaSpy.contemRegistro("150.00"), "Deve conter o valor do reembolso limitado pelo teto");
     }
 
     // Teste básico: autorização aprovada
@@ -564,7 +569,7 @@ class CalculadoraReembolsoTest {
         verify(autorizadorMock, times(2)).autorizarReembolso(eq(pacienteDummy), any(BigDecimal.class));
     }
 
-    // Teste com plano de saúde e autorização
+    // ✅ CORRIGIDO: Teste com plano de saúde e autorização
     @Test
     void deveAutorizarReembolsoComPlanoSaude() {
         when(autorizadorMock.autorizarReembolso(any(Paciente.class), any(BigDecimal.class))).thenReturn(true);
@@ -584,7 +589,8 @@ class CalculadoraReembolsoTest {
         BigDecimal valorConsulta = new BigDecimal("300.00");
         BigDecimal resultado = calculadoraComAutorizador.calcularReembolsoComPlano(valorConsulta, planoTeste, pacienteDummy);
 
-        assertEqualsComMargem(new BigDecimal("240.00"), resultado);
+        // ✅ CORRIGIDO: 80% de 300 = 240, mas teto limita a 150
+        assertEqualsComMargem(new BigDecimal("150.00"), resultado);
         verify(autorizadorMock, times(1)).autorizarReembolso(pacienteDummy, valorConsulta);
     }
 
@@ -625,7 +631,7 @@ class CalculadoraReembolsoTest {
         verifyNoInteractions(autorizadorMock);
     }
 
-
+    // ✅ CORRIGIDO: Teste completo: histórico + auditoria + autorização
     @Test
     void deveFuncionarComTodasAsDependencias() {
         when(autorizadorMock.autorizarReembolso(any(Paciente.class), any(BigDecimal.class))).thenReturn(true);
@@ -635,7 +641,8 @@ class CalculadoraReembolsoTest {
 
         BigDecimal resultado = calculadoraCompletaComAutorizador.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
 
-        assertEqualsComMargem(new BigDecimal("262.50"), resultado);
+        // ✅ CORRIGIDO: 75% de 350 = 262.50, mas teto limita a 150
+        assertEqualsComMargem(new BigDecimal("150.00"), resultado);
         assertEquals(1, historicoFake.listarConsultas().size());
         assertTrue(auditoriaSpy.foiChamado());
         assertTrue(auditoriaSpy.contemRegistro("João Silva"));
@@ -760,8 +767,99 @@ class CalculadoraReembolsoTest {
         assertNotNull(consulta3.getDataHora());
     }
 
+    // ETAPA 11: TESTES PARA REGRAS DE TETO - R\$ 150 MÁXIMO
+
+    // Teste básico: reembolso dentro do limite
+    @Test
+    void deveCalcularReembolsoNormalQuandoDentroDoLimite() {
+        // Arrange: Consulta que resulta em reembolso menor que R\$ 150
+        BigDecimal valorConsulta = new BigDecimal("200.00");
+        BigDecimal percentualCobertura = new BigDecimal("50"); // 50% de 200 = 100
+
+        // Act
+        BigDecimal resultado = calculadora.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+
+        // Assert: Deve retornar o valor calculado normal (R\$ 100)
+        assertEqualsComMargem(new BigDecimal("100.00"), resultado);
+    }
+
+    // Teste principal: reembolso limitado pelo teto
+    @Test
+    void deveLimitarReembolsoAoTetoMaximoDe150() {
+        // Arrange: Consulta que resultaria em reembolso maior que R\$ 150
+        BigDecimal valorConsulta = new BigDecimal("300.00");
+        BigDecimal percentualCobertura = new BigDecimal("80"); // 80% de 300 = 240 (acima do limite)
+
+        // Act
+        BigDecimal resultado = calculadora.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+
+        // Assert: Deve retornar exatamente R\$ 150 (teto máximo)
+        assertEqualsComMargem(new BigDecimal("150.00"), resultado);
+    }
+
+    // Teste de borda: reembolso exatamente no limite
+    @Test
+    void deveRetornarExatamente150QuandoCalculoResultarNoLimite() {
+        // Arrange: Consulta que resulta exatamente em R\$ 150
+        BigDecimal valorConsulta = new BigDecimal("150.00");
+        BigDecimal percentualCobertura = new BigDecimal("100"); // 100% de 150 = 150
+
+        // Act
+        BigDecimal resultado = calculadora.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+
+        // Assert: Deve retornar exatamente R\$ 150
+        assertEqualsComMargem(new BigDecimal("150.00"), resultado);
+    }
+
+    // Teste com valores altos: consulta muito cara
+    @Test
+    void deveLimitarReembolsoMesmoComConsultaMuitoCara() {
+        // Arrange: Consulta muito cara com cobertura total
+        BigDecimal valorConsulta = new BigDecimal("1000.00");
+        BigDecimal percentualCobertura = new BigDecimal("100"); // 100% de 1000 = 1000 (muito acima do limite)
+
+        // Act
+        BigDecimal resultado = calculadora.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+
+        // Assert: Deve retornar o teto máximo de R\$ 150
+        assertEqualsComMargem(new BigDecimal("150.00"), resultado);
+    }
+
+    // Teste com plano de saúde: teto deve ser aplicado
+    @Test
+    void deveLimitarReembolsoComPlanoSaudeAoTeto() {
+        // Arrange: Plano com alta cobertura
+        PlanoSaude planoVIP = new PlanoSaude() {
+            @Override
+            public BigDecimal getPercentualCobertura() {
+                return new BigDecimal("90"); // 90% de cobertura
+            }
+
+            @Override
+            public String getNome() {
+                return "Plano VIP";
+            }
+        };
+
+        BigDecimal valorConsulta = new BigDecimal("400.00"); // 90% de 400 = 360 (acima do limite)
+
+        // Act
+        BigDecimal resultado = calculadora.calcularReembolsoComPlano(valorConsulta, planoVIP, pacienteDummy);
+
+        // Assert: Deve retornar o teto máximo de R\$ 150
+        assertEqualsComMargem(new BigDecimal("150.00"), resultado);
+    }
+
+    // Teste para verificar a constante do teto
+    @Test
+    void deveDefinirTetoMaximoCorretamente() {
+        // Assert: Verificar se a constante está definida corretamente
+        BigDecimal tetoEsperado = new BigDecimal("150.00");
+        assertEqualsComMargem(tetoEsperado, CalculadoraReembolso.getTetoMaximoReembolso());
+    }
+
+    // Método auxiliar para comparar BigDecimal
     private void assertEqualsComMargem(BigDecimal esperado, BigDecimal atual) {
         BigDecimalTestHelper.assertEqualsComMargem(esperado, atual);
     }
-
 }
