@@ -4,59 +4,96 @@ import tp2.net.nicole.gode.model.Consulta;
 import tp2.net.nicole.gode.model.Paciente;
 import tp2.net.nicole.gode.model.PlanoSaude;
 import tp2.net.nicole.gode.repository.HistoricoConsultas;
+
 import java.math.BigDecimal;
-import java.math.RoundingMode;
+import java.time.LocalDateTime;
 
 public class CalculadoraReembolso {
+    private HistoricoConsultas historico;
+    private Auditoria auditoria;
+    private AutorizadorReembolso autorizador;
 
-    private final HistoricoConsultas historico;
 
-    // Construtor sem histórico (para compatibilidade com testes antigos)
     public CalculadoraReembolso() {
         this.historico = null;
+        this.auditoria = null;
+        this.autorizador = null;
     }
 
-    // Construtor com histórico
+
     public CalculadoraReembolso(HistoricoConsultas historico) {
         this.historico = historico;
+        this.auditoria = null;
+        this.autorizador = null;
     }
 
-    // Método com percentual direto
+
+    public CalculadoraReembolso(Auditoria auditoria) {
+        this.historico = null;
+        this.auditoria = auditoria;
+        this.autorizador = null;
+    }
+
+
+    public CalculadoraReembolso(HistoricoConsultas historico, Auditoria auditoria) {
+        this.historico = historico;
+        this.auditoria = auditoria;
+        this.autorizador = null;
+    }
+
+
+    public CalculadoraReembolso(AutorizadorReembolso autorizador) {
+        this.historico = null;
+        this.auditoria = null;
+        this.autorizador = autorizador;
+    }
+
+
+    public CalculadoraReembolso(HistoricoConsultas historico, Auditoria auditoria, AutorizadorReembolso autorizador) {
+        this.historico = historico;
+        this.auditoria = auditoria;
+        this.autorizador = autorizador;
+    }
+
     public BigDecimal calcularReembolso(BigDecimal valorConsulta, BigDecimal percentualCobertura, Paciente paciente) {
         if (valorConsulta == null || percentualCobertura == null) {
             return BigDecimal.ZERO;
         }
 
-        BigDecimal valorReembolso = valorConsulta
-                .multiply(percentualCobertura)
-                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
 
-        // Registra no histórico se disponível
-        if (historico != null && paciente != null) {
-            Consulta consulta = new Consulta(valorConsulta, percentualCobertura, valorReembolso, paciente.getNome());
+        if (autorizador != null) {
+            boolean autorizado = autorizador.autorizarReembolso(paciente, valorConsulta);
+            if (!autorizado) {
+                String nomePaciente = (paciente != null) ? paciente.getNome() : "Anônimo";
+                throw new ReembolsoNaoAutorizadoException("Reembolso não autorizado para o paciente: " + nomePaciente);
+            }
+        }
+
+        BigDecimal reembolso = valorConsulta.multiply(percentualCobertura).divide(new BigDecimal("100"));
+
+
+        if (historico != null) {
+            String nomePaciente = (paciente != null) ? paciente.getNome() : "Anônimo";
+            Consulta consulta = new Consulta(valorConsulta, percentualCobertura, reembolso, nomePaciente, LocalDateTime.now());
             historico.adicionarConsulta(consulta);
         }
 
-        return valorReembolso;
+        if (auditoria != null) {
+            String nomePaciente = (paciente != null) ? paciente.getNome() : "Anônimo";
+            String detalhes = String.format("Consulta autorizada e registrada para o paciente: %s - Valor: %s - Reembolso: %s",
+                    nomePaciente, valorConsulta, reembolso);
+            auditoria.registrarConsulta(detalhes);
+        }
+
+        return reembolso;
     }
 
-    // Método com plano de saúde - NOME DIFERENTE para evitar ambiguidade
     public BigDecimal calcularReembolsoComPlano(BigDecimal valorConsulta, PlanoSaude plano, Paciente paciente) {
-        if (valorConsulta == null || plano == null) {
+        if (plano == null) {
             return BigDecimal.ZERO;
         }
 
         BigDecimal percentualCobertura = plano.getPercentualCobertura();
-        BigDecimal valorReembolso = valorConsulta
-                .multiply(percentualCobertura)
-                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
-
-        // Registra no histórico se disponível
-        if (historico != null && paciente != null) {
-            Consulta consulta = new Consulta(valorConsulta, percentualCobertura, valorReembolso, paciente.getNome());
-            historico.adicionarConsulta(consulta);
-        }
-
-        return valorReembolso;
+        return calcularReembolso(valorConsulta, percentualCobertura, paciente);
     }
 }

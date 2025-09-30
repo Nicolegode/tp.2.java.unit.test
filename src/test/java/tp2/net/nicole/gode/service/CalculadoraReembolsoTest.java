@@ -4,10 +4,15 @@ import tp2.net.nicole.gode.model.Paciente;
 import tp2.net.nicole.gode.repository.HistoricoConsultasFake;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 import java.math.BigDecimal;
 import tp2.net.nicole.gode.model.PlanoSaude;
 
+@ExtendWith(MockitoExtension.class)
 class CalculadoraReembolsoTest {
 
     private CalculadoraReembolso calculadora;
@@ -15,16 +20,38 @@ class CalculadoraReembolsoTest {
     private Paciente pacienteDummy;
     private HistoricoConsultasFake historicoFake;
 
+    //  Auditoria
+    private AuditoriaSpy auditoriaSpy;
+    private CalculadoraReembolso calculadoraComAuditoria;
+    private CalculadoraReembolso calculadoraCompleta;
+
+    //  Autorização
+    @Mock
+    private AutorizadorReembolso autorizadorMock;
+    private CalculadoraReembolso calculadoraComAutorizador;
+    private CalculadoraReembolso calculadoraCompletaComAutorizador;
+
     @BeforeEach
     void setUp() {
-        // Criando as instâncias para os testes
+        // Instâncias existentes
         calculadora = new CalculadoraReembolso();
         historicoFake = new HistoricoConsultasFake();
         calculadoraComHistorico = new CalculadoraReembolso(historicoFake);
         pacienteDummy = new Paciente("João Silva");
+
+        // Auditoria
+        auditoriaSpy = new AuditoriaSpy();
+        calculadoraComAuditoria = new CalculadoraReembolso(auditoriaSpy);
+        calculadoraCompleta = new CalculadoraReembolso(historicoFake, auditoriaSpy);
+
+        //  Novas instâncias com autorizador
+        calculadoraComAutorizador = new CalculadoraReembolso(autorizadorMock);
+        calculadoraCompletaComAutorizador = new CalculadoraReembolso(historicoFake, auditoriaSpy, autorizadorMock);
     }
 
-    // Primeiro teste - calculando reembolso básico
+
+
+    // Calculando reembolso básico
     @Test
     void deveCalcularReembolsoBasicoComPercentualFixo() {
         BigDecimal valorConsulta = new BigDecimal("200.00");
@@ -195,12 +222,10 @@ class CalculadoraReembolsoTest {
         assertEquals("João Silva", consultaRegistrada.getNomePaciente());
     }
 
-    // ETAPA 6: TESTES COM PLANOS DE SAÚDE (usando calcularReembolsoComPlano)
 
     // Testando com plano básico que tem 50% de cobertura
     @Test
     void deveCalcularReembolsoComPlanoBasico() {
-        // Criando um plano básico que sempre retorna 50%
         PlanoSaude planoBasico = new PlanoSaude() {
             @Override
             public BigDecimal getPercentualCobertura() {
@@ -223,7 +248,6 @@ class CalculadoraReembolsoTest {
     // Testando com plano premium que tem cobertura maior
     @Test
     void deveCalcularReembolsoComPlanoPremium() {
-        // Criando um plano premium que sempre retorna 80%
         PlanoSaude planoPremium = new PlanoSaude() {
             @Override
             public BigDecimal getPercentualCobertura() {
@@ -246,7 +270,6 @@ class CalculadoraReembolsoTest {
     // Comparando diferentes planos para ver se o cálculo muda
     @Test
     void deveCompararDiferentesPlanos() {
-        // Plano com 50% de cobertura
         PlanoSaude plano50 = new PlanoSaude() {
             @Override
             public BigDecimal getPercentualCobertura() {
@@ -259,7 +282,6 @@ class CalculadoraReembolsoTest {
             }
         };
 
-        // Plano com 80% de cobertura
         PlanoSaude plano80 = new PlanoSaude() {
             @Override
             public BigDecimal getPercentualCobertura() {
@@ -321,7 +343,6 @@ class CalculadoraReembolsoTest {
     // Testando planos com percentuais bem diferentes
     @Test
     void deveFuncionarComPlanosComPercentuaisVariados() {
-        // Plano econômico com apenas 25%
         PlanoSaude plano25 = new PlanoSaude() {
             @Override
             public BigDecimal getPercentualCobertura() {
@@ -334,7 +355,6 @@ class CalculadoraReembolsoTest {
             }
         };
 
-        // Plano completo com 100%
         PlanoSaude plano100 = new PlanoSaude() {
             @Override
             public BigDecimal getPercentualCobertura() {
@@ -354,6 +374,282 @@ class CalculadoraReembolsoTest {
 
         assertEqualsComMargem(new BigDecimal("100.00"), resultado25);
         assertEqualsComMargem(new BigDecimal("400.00"), resultado100);
+    }
+
+
+
+    // Teste básico: verificar se a auditoria é chamada
+    @Test
+    void deveRegistrarConsultaNaAuditoria() {
+        BigDecimal valorConsulta = new BigDecimal("200.00");
+        BigDecimal percentualCobertura = new BigDecimal("70");
+
+        calculadoraComAuditoria.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+
+        assertTrue(auditoriaSpy.foiChamado(), "Auditoria deveria ter sido chamada");
+        assertEquals(1, auditoriaSpy.getQuantidadeChamadas(), "Auditoria deveria ter sido chamada exatamente 1 vez");
+    }
+
+    // Teste verificando o conteúdo do registro de auditoria
+    @Test
+    void deveRegistrarDetalhesCorretosNaAuditoria() {
+        BigDecimal valorConsulta = new BigDecimal("300.00");
+        BigDecimal percentualCobertura = new BigDecimal("80");
+
+        calculadoraComAuditoria.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+
+        String ultimoRegistro = auditoriaSpy.getUltimoRegistro();
+        assertTrue(ultimoRegistro.contains("João Silva"), "Registro deve conter o nome do paciente");
+        assertTrue(ultimoRegistro.contains("300.00"), "Registro deve conter o valor da consulta");
+        assertTrue(ultimoRegistro.contains("240.00"), "Registro deve conter o valor do reembolso");
+    }
+
+    // Teste com múltiplas consultas
+    @Test
+    void deveRegistrarMultiplasConsultasNaAuditoria() {
+        Paciente paciente1 = new Paciente("Maria Santos");
+        Paciente paciente2 = new Paciente("Pedro Oliveira");
+
+        calculadoraComAuditoria.calcularReembolso(new BigDecimal("100.00"), new BigDecimal("50"), paciente1);
+        calculadoraComAuditoria.calcularReembolso(new BigDecimal("200.00"), new BigDecimal("70"), paciente2);
+
+        assertEquals(2, auditoriaSpy.getQuantidadeChamadas(), "Auditoria deveria ter sido chamada 2 vezes");
+        assertTrue(auditoriaSpy.contemRegistro("Maria Santos"), "Deve conter registro da Maria");
+        assertTrue(auditoriaSpy.contemRegistro("Pedro Oliveira"), "Deve conter registro do Pedro");
+    }
+
+    // Teste com paciente nulo
+    @Test
+    void deveRegistrarAuditoriaComPacienteAnonimo() {
+        BigDecimal valorConsulta = new BigDecimal("150.00");
+        BigDecimal percentualCobertura = new BigDecimal("60");
+
+        calculadoraComAuditoria.calcularReembolso(valorConsulta, percentualCobertura, null);
+
+        assertTrue(auditoriaSpy.foiChamado(), "Auditoria deveria ter sido chamada");
+        assertTrue(auditoriaSpy.contemRegistro("Anônimo"), "Deve registrar paciente como Anônimo");
+    }
+
+    // Teste com calculadora sem auditoria (não deve chamar)
+    @Test
+    void naoDeveRegistrarAuditoriaQuandoNaoConfigurada() {
+        BigDecimal valorConsulta = new BigDecimal("100.00");
+        BigDecimal percentualCobertura = new BigDecimal("50");
+
+        calculadora.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+
+        assertFalse(auditoriaSpy.foiChamado(), "Auditoria não deveria ter sido chamada");
+        assertEquals(0, auditoriaSpy.getQuantidadeChamadas(), "Nenhuma chamada deveria ter sido feita");
+    }
+
+    // Teste com histórico E auditoria funcionando juntos
+    @Test
+    void deveFuncionarComHistoricoEAuditoriaSimultaneamente() {
+        BigDecimal valorConsulta = new BigDecimal("250.00");
+        BigDecimal percentualCobertura = new BigDecimal("75");
+
+        calculadoraCompleta.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+
+        assertEquals(1, historicoFake.listarConsultas().size(), "Deve ter 1 consulta no histórico");
+        assertTrue(auditoriaSpy.foiChamado(), "Auditoria deveria ter sido chamada");
+        assertTrue(auditoriaSpy.contemRegistro("João Silva"), "Auditoria deve conter o nome do paciente");
+    }
+
+    // Teste com plano de saúde e auditoria
+    @Test
+    void deveRegistrarAuditoriaComPlanoSaude() {
+        PlanoSaude planoTeste = new PlanoSaude() {
+            @Override
+            public BigDecimal getPercentualCobertura() {
+                return new BigDecimal("80");
+            }
+
+            @Override
+            public String getNome() {
+                return "Plano Premium";
+            }
+        };
+
+        BigDecimal valorConsulta = new BigDecimal("400.00");
+        calculadoraComAuditoria.calcularReembolsoComPlano(valorConsulta, planoTeste, pacienteDummy);
+
+        assertTrue(auditoriaSpy.foiChamado(), "Auditoria deveria ter sido chamada");
+        assertTrue(auditoriaSpy.contemRegistro("João Silva"), "Deve conter o nome do paciente");
+        assertTrue(auditoriaSpy.contemRegistro("400.00"), "Deve conter o valor da consulta");
+        assertTrue(auditoriaSpy.contemRegistro("320.00"), "Deve conter o valor do reembolso (80% de 400)");
+    }
+
+
+
+    // Teste básico: autorização aprovada
+    @Test
+    void deveCalcularReembolsoQuandoAutorizado() {
+        when(autorizadorMock.autorizarReembolso(any(Paciente.class), any(BigDecimal.class))).thenReturn(true);
+
+        BigDecimal valorConsulta = new BigDecimal("200.00");
+        BigDecimal percentualCobertura = new BigDecimal("70");
+
+        BigDecimal resultado = calculadoraComAutorizador.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+
+        BigDecimal esperado = new BigDecimal("140.00");
+        assertEqualsComMargem(esperado, resultado);
+
+        verify(autorizadorMock, times(1)).autorizarReembolso(pacienteDummy, valorConsulta);
+    }
+
+    // Teste principal: autorização negada deve lançar exceção
+    @Test
+    void deveLancarExcecaoQuandoReembolsoNaoAutorizado() {
+        when(autorizadorMock.autorizarReembolso(any(Paciente.class), any(BigDecimal.class))).thenReturn(false);
+
+        BigDecimal valorConsulta = new BigDecimal("200.00");
+        BigDecimal percentualCobertura = new BigDecimal("70");
+
+        ReembolsoNaoAutorizadoException exception = assertThrows(
+                ReembolsoNaoAutorizadoException.class,
+                () -> calculadoraComAutorizador.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy)
+        );
+
+        assertTrue(exception.getMessage().contains("João Silva"));
+        assertTrue(exception.getMessage().contains("não autorizado"));
+
+        verify(autorizadorMock, times(1)).autorizarReembolso(pacienteDummy, valorConsulta);
+    }
+
+    // Teste com paciente nulo e autorização negada
+    @Test
+    void deveLancarExcecaoComPacienteNuloQuandoNaoAutorizado() {
+        when(autorizadorMock.autorizarReembolso(isNull(), any(BigDecimal.class))).thenReturn(false);
+
+        BigDecimal valorConsulta = new BigDecimal("150.00");
+        BigDecimal percentualCobertura = new BigDecimal("60");
+
+        ReembolsoNaoAutorizadoException exception = assertThrows(
+                ReembolsoNaoAutorizadoException.class,
+                () -> calculadoraComAutorizador.calcularReembolso(valorConsulta, percentualCobertura, null)
+        );
+
+        assertTrue(exception.getMessage().contains("Anônimo"));
+        verify(autorizadorMock, times(1)).autorizarReembolso(null, valorConsulta);
+    }
+
+    // Teste com diferentes valores de consulta
+    @Test
+    void deveAutorizarComDiferentesValores() {
+        when(autorizadorMock.autorizarReembolso(any(Paciente.class), any(BigDecimal.class)))
+                .thenAnswer(invocation -> {
+                    BigDecimal valor = invocation.getArgument(1);
+                    return valor.compareTo(new BigDecimal("300.00")) <= 0;
+                });
+
+        BigDecimal valorBaixo = new BigDecimal("250.00");
+        BigDecimal resultado1 = calculadoraComAutorizador.calcularReembolso(valorBaixo, new BigDecimal("50"), pacienteDummy);
+        assertEqualsComMargem(new BigDecimal("125.00"), resultado1);
+
+        BigDecimal valorAlto = new BigDecimal("400.00");
+        assertThrows(ReembolsoNaoAutorizadoException.class,
+                () -> calculadoraComAutorizador.calcularReembolso(valorAlto, new BigDecimal("50"), pacienteDummy));
+
+        verify(autorizadorMock, times(2)).autorizarReembolso(eq(pacienteDummy), any(BigDecimal.class));
+    }
+
+    // Teste com plano de saúde e autorização
+    @Test
+    void deveAutorizarReembolsoComPlanoSaude() {
+        when(autorizadorMock.autorizarReembolso(any(Paciente.class), any(BigDecimal.class))).thenReturn(true);
+
+        PlanoSaude planoTeste = new PlanoSaude() {
+            @Override
+            public BigDecimal getPercentualCobertura() {
+                return new BigDecimal("80");
+            }
+
+            @Override
+            public String getNome() {
+                return "Plano Premium";
+            }
+        };
+
+        BigDecimal valorConsulta = new BigDecimal("300.00");
+        BigDecimal resultado = calculadoraComAutorizador.calcularReembolsoComPlano(valorConsulta, planoTeste, pacienteDummy);
+
+        assertEqualsComMargem(new BigDecimal("240.00"), resultado);
+        verify(autorizadorMock, times(1)).autorizarReembolso(pacienteDummy, valorConsulta);
+    }
+
+    // Teste com plano de saúde e autorização negada
+    @Test
+    void deveLancarExcecaoComPlanoQuandoNaoAutorizado() {
+        when(autorizadorMock.autorizarReembolso(any(Paciente.class), any(BigDecimal.class))).thenReturn(false);
+
+        PlanoSaude planoTeste = new PlanoSaude() {
+            @Override
+            public BigDecimal getPercentualCobertura() {
+                return new BigDecimal("60");
+            }
+
+            @Override
+            public String getNome() {
+                return "Plano Básico";
+            }
+        };
+
+        BigDecimal valorConsulta = new BigDecimal("200.00");
+
+        assertThrows(ReembolsoNaoAutorizadoException.class,
+                () -> calculadoraComAutorizador.calcularReembolsoComPlano(valorConsulta, planoTeste, pacienteDummy));
+
+        verify(autorizadorMock, times(1)).autorizarReembolso(pacienteDummy, valorConsulta);
+    }
+
+    // Teste sem autorizador configurado (deve funcionar normalmente)
+    @Test
+    void deveFuncionarNormalmenteSemAutorizador() {
+        BigDecimal valorConsulta = new BigDecimal("200.00");
+        BigDecimal percentualCobertura = new BigDecimal("70");
+
+        BigDecimal resultado = calculadora.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+
+        assertEqualsComMargem(new BigDecimal("140.00"), resultado);
+        verifyNoInteractions(autorizadorMock);
+    }
+
+    // Teste completo: histórico + auditoria + autorização
+    @Test
+    void deveFuncionarComTodasAsDependencias() {
+        when(autorizadorMock.autorizarReembolso(any(Paciente.class), any(BigDecimal.class))).thenReturn(true);
+
+        BigDecimal valorConsulta = new BigDecimal("350.00");
+        BigDecimal percentualCobertura = new BigDecimal("75");
+
+        BigDecimal resultado = calculadoraCompletaComAutorizador.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+
+        assertEqualsComMargem(new BigDecimal("262.50"), resultado);
+        assertEquals(1, historicoFake.listarConsultas().size());
+        assertTrue(auditoriaSpy.foiChamado());
+        assertTrue(auditoriaSpy.contemRegistro("João Silva"));
+        verify(autorizadorMock, times(1)).autorizarReembolso(pacienteDummy, valorConsulta);
+    }
+
+    // Teste de múltiplas autorizações
+    @Test
+    void deveProcessarMultiplasAutorizacoes() {
+        when(autorizadorMock.autorizarReembolso(any(Paciente.class), any(BigDecimal.class)))
+                .thenReturn(true)
+                .thenReturn(false);
+
+        Paciente paciente1 = new Paciente("Maria Santos");
+        Paciente paciente2 = new Paciente("Pedro Oliveira");
+
+        BigDecimal resultado1 = calculadoraComAutorizador.calcularReembolso(
+                new BigDecimal("100.00"), new BigDecimal("50"), paciente1);
+        assertEqualsComMargem(new BigDecimal("50.00"), resultado1);
+
+        assertThrows(ReembolsoNaoAutorizadoException.class,
+                () -> calculadoraComAutorizador.calcularReembolso(
+                        new BigDecimal("200.00"), new BigDecimal("60"), paciente2));
+
+        verify(autorizadorMock, times(2)).autorizarReembolso(any(Paciente.class), any(BigDecimal.class));
     }
 
     // Método auxiliar para comparar BigDecimal
