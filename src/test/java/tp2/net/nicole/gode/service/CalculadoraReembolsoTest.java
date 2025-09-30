@@ -11,6 +11,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import java.math.BigDecimal;
 import tp2.net.nicole.gode.model.PlanoSaude;
+import tp2.net.nicole.gode.helper.ConsultaTestHelper;
+import tp2.net.nicole.gode.model.Consulta;
 
 @ExtendWith(MockitoExtension.class)
 class CalculadoraReembolsoTest {
@@ -44,23 +46,25 @@ class CalculadoraReembolsoTest {
         calculadoraComAuditoria = new CalculadoraReembolso(auditoriaSpy);
         calculadoraCompleta = new CalculadoraReembolso(historicoFake, auditoriaSpy);
 
-        //  Novas instâncias com autorizador
+        //  Instâncias com autorizador
         calculadoraComAutorizador = new CalculadoraReembolso(autorizadorMock);
         calculadoraCompletaComAutorizador = new CalculadoraReembolso(historicoFake, auditoriaSpy, autorizadorMock);
     }
 
 
-
-    // Calculando reembolso básico
     @Test
     void deveCalcularReembolsoBasicoComPercentualFixo() {
-        BigDecimal valorConsulta = new BigDecimal("200.00");
-        BigDecimal percentualCobertura = new BigDecimal("70");
+        // USANDO O HELPER para criar dados de teste
+        Consulta consultaTeste = ConsultaTestHelper.criarConsultaPlanoAutorizado();
 
-        BigDecimal resultado = calculadora.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+        BigDecimal resultado = calculadora.calcularReembolso(
+                consultaTeste.getValorConsulta(),
+                consultaTeste.getPercentualCobertura(),
+                pacienteDummy
+        );
 
-        BigDecimal esperado = new BigDecimal("140.00");
-        assertEqualsComMargem(esperado, resultado);
+        // Usar o valor esperado do helper
+        assertEqualsComMargem(consultaTeste.getValorReembolso(), resultado);
     }
 
     // Testando quando o valor da consulta é zero
@@ -156,26 +160,37 @@ class CalculadoraReembolsoTest {
         assertEqualsComMargem(esperado, resultado);
     }
 
-    // Verificando se a consulta fica salva no histórico
     @Test
     void deveRegistrarConsultaNoHistorico() {
-        BigDecimal valorConsulta = new BigDecimal("200.00");
-        BigDecimal percentualCobertura = new BigDecimal("70");
+        // USANDO O HELPER para criar dados de teste
+        Consulta consultaTeste = ConsultaTestHelper.criarConsultaPadrao();
 
-        calculadoraComHistorico.calcularReembolso(valorConsulta, percentualCobertura, pacienteDummy);
+        calculadoraComHistorico.calcularReembolso(
+                consultaTeste.getValorConsulta(),
+                consultaTeste.getPercentualCobertura(),
+                pacienteDummy
+        );
 
         assertEquals(1, historicoFake.listarConsultas().size());
         assertEquals("João Silva", historicoFake.listarConsultas().getFirst().getNomePaciente());
     }
 
-    // Testando múltiplas consultas no histórico
+    //Testando múltiplas consultas no histórico
     @Test
     void deveRegistrarMultiplasConsultasNoHistorico() {
         Paciente paciente1 = new Paciente("Maria Santos");
         Paciente paciente2 = new Paciente("Pedro Oliveira");
 
-        calculadoraComHistorico.calcularReembolso(new BigDecimal("100.00"), new BigDecimal("50"), paciente1);
-        calculadoraComHistorico.calcularReembolso(new BigDecimal("300.00"), new BigDecimal("80"), paciente2);
+        // USANDO O HELPER para criar consultas de teste
+        Consulta consulta1 = ConsultaTestHelper.criarConsulta(
+                new BigDecimal("100.00"), new BigDecimal("50"), "Maria Santos");
+        Consulta consulta2 = ConsultaTestHelper.criarConsulta(
+                new BigDecimal("300.00"), new BigDecimal("80"), "Pedro Oliveira");
+
+        calculadoraComHistorico.calcularReembolso(
+                consulta1.getValorConsulta(), consulta1.getPercentualCobertura(), paciente1);
+        calculadoraComHistorico.calcularReembolso(
+                consulta2.getValorConsulta(), consulta2.getPercentualCobertura(), paciente2);
 
         assertEquals(2, historicoFake.listarConsultas().size());
     }
@@ -221,7 +236,6 @@ class CalculadoraReembolsoTest {
         assertEqualsComMargem(resultadoCalculado, consultaRegistrada.getValorReembolso());
         assertEquals("João Silva", consultaRegistrada.getNomePaciente());
     }
-
 
     // Testando com plano básico que tem 50% de cobertura
     @Test
@@ -376,8 +390,6 @@ class CalculadoraReembolsoTest {
         assertEqualsComMargem(new BigDecimal("400.00"), resultado100);
     }
 
-
-
     // Teste básico: verificar se a auditoria é chamada
     @Test
     void deveRegistrarConsultaNaAuditoria() {
@@ -478,8 +490,6 @@ class CalculadoraReembolsoTest {
         assertTrue(auditoriaSpy.contemRegistro("400.00"), "Deve conter o valor da consulta");
         assertTrue(auditoriaSpy.contemRegistro("320.00"), "Deve conter o valor do reembolso (80% de 400)");
     }
-
-
 
     // Teste básico: autorização aprovada
     @Test
@@ -650,6 +660,105 @@ class CalculadoraReembolsoTest {
                         new BigDecimal("200.00"), new BigDecimal("60"), paciente2));
 
         verify(autorizadorMock, times(2)).autorizarReembolso(any(Paciente.class), any(BigDecimal.class));
+    }
+
+    // ETAPA 9: NOVOS TESTES DEMONSTRANDO O USO DO HELPER
+
+    // Teste demonstrando o helper básico
+    @Test
+    void deveUsarHelperParaCriarConsultaPadrao() {
+        // USANDO O HELPER ao invés de criar manualmente
+        Consulta consultaPadrao = ConsultaTestHelper.criarConsultaPadrao();
+
+        // Verificar se os dados padrão estão corretos
+        assertNotNull(consultaPadrao);
+        assertEquals("Paciente Padrão", consultaPadrao.getNomePaciente());
+        assertEqualsComMargem(new BigDecimal("100.00"), consultaPadrao.getValorConsulta());
+        assertEqualsComMargem(new BigDecimal("80.00"), consultaPadrao.getPercentualCobertura());
+        assertEqualsComMargem(new BigDecimal("80.00"), consultaPadrao.getValorReembolso());
+        assertNotNull(consultaPadrao.getDataHora());
+    }
+
+    // Teste demonstrando helper customizado
+    @Test
+    void deveUsarHelperParaCriarConsultaCustomizada() {
+        // USANDO O HELPER com valores específicos
+        Consulta consultaCustom = ConsultaTestHelper.criarConsulta(
+                new BigDecimal("250.00"),
+                new BigDecimal("75"),
+                "Cliente Especial"
+        );
+
+        // Verificar se os valores customizados estão corretos
+        assertEquals("Cliente Especial", consultaCustom.getNomePaciente());
+        assertEqualsComMargem(new BigDecimal("250.00"), consultaCustom.getValorConsulta());
+        assertEqualsComMargem(new BigDecimal("75"), consultaCustom.getPercentualCobertura());
+        assertEqualsComMargem(new BigDecimal("187.50"), consultaCustom.getValorReembolso()); // 75% de 250
+    }
+
+    // Teste demonstrando helpers para cenários específicos
+    @Test
+    void deveUsarHelperParaCenariosEspecificos() {
+        // USANDO HELPERS para diferentes cenários
+        Consulta consultaAutorizada = ConsultaTestHelper.criarConsultaPlanoAutorizado();
+        Consulta consultaDenegada = ConsultaTestHelper.criarConsultaPlanoDenegado();
+
+        // Verificar consulta autorizada
+        assertEquals("Paciente Autorizado", consultaAutorizada.getNomePaciente());
+        assertEqualsComMargem(new BigDecimal("200.00"), consultaAutorizada.getValorConsulta());
+
+        // Verificar consulta denegada
+        assertEquals("Paciente Negado", consultaDenegada.getNomePaciente());
+        assertEqualsComMargem(new BigDecimal("500.00"), consultaDenegada.getValorConsulta());
+    }
+
+    // Teste demonstrando como o helper facilita testes de integração
+    @Test
+    void deveUsarHelperEmTesteDeIntegracao() {
+        // USANDO O HELPER para criar dados de teste rapidamente
+        Consulta consultaTeste = ConsultaTestHelper.criarConsultaPadrao();
+
+        // Testar com calculadora que tem histórico e auditoria
+        BigDecimal resultado = calculadoraCompleta.calcularReembolso(
+                consultaTeste.getValorConsulta(),
+                consultaTeste.getPercentualCobertura(),
+                new Paciente("João Silva")
+        );
+
+        // Verificar resultado
+        assertEqualsComMargem(consultaTeste.getValorReembolso(), resultado);
+
+        // Verificar se foi salvo no histórico
+        assertEquals(1, historicoFake.listarConsultas().size());
+
+        // Verificar se foi registrado na auditoria
+        assertTrue(auditoriaSpy.foiChamado());
+        assertTrue(auditoriaSpy.contemRegistro("João Silva"));
+    }
+
+    // Teste demonstrando reutilização do helper
+    @Test
+    void deveReutilizarHelperParaMultiplosTestes() {
+        // REUTILIZANDO O HELPER em múltiplos cenários
+        Consulta consulta1 = ConsultaTestHelper.criarConsultaPadrao();
+        Consulta consulta2 = ConsultaTestHelper.criarConsultaPlanoAutorizado();
+        Consulta consulta3 = ConsultaTestHelper.criarConsulta(
+                new BigDecimal("150.00"), new BigDecimal("60"), "Teste Reutilização"
+        );
+
+        // Verificar que todas as consultas foram criadas corretamente
+        assertNotNull(consulta1);
+        assertNotNull(consulta2);
+        assertNotNull(consulta3);
+
+        // Verificar que têm dados diferentes
+        assertNotEquals(consulta1.getNomePaciente(), consulta2.getNomePaciente());
+        assertNotEquals(consulta2.getValorConsulta(), consulta3.getValorConsulta());
+
+        // Todos devem ter data/hora
+        assertNotNull(consulta1.getDataHora());
+        assertNotNull(consulta2.getDataHora());
+        assertNotNull(consulta3.getDataHora());
     }
 
     // Método auxiliar para comparar BigDecimal
